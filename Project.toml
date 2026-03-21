@@ -5,6 +5,7 @@ authors = ["JJ Garzella <jjgarzella@gmail.com> and contributors"]
 
 [deps]
 Oscar = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
+rforest_jll = "c4d57d3f-714b-5b1e-bf7d-8d40e34b96d7"
 
 [compat]
 Oscar = "1.7.0"

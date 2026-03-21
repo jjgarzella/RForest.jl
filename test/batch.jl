@@ -26,7 +26,7 @@ function batch_factorial(n, e, gamma)
     R, k = polynomial_ring(ZZ, :k)
     M = matrix(R, 1, 1, [k])
     a, b = numerator(gamma), denominator(gamma)
-    k_func = p -> -(-a * p ÷ b)
+    k_func = p -> -fld(-a * p, b)
     m_func = p -> p^e
     primes = Primes.primes(2, n - 1)
 
