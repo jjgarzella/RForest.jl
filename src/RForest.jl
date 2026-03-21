@@ -1,5 +1,9 @@
 module RForest
 
-# Write your package code here.
+using Oscar
+
+include("RemainderForest.jl")
+
+export remainder_forest
 
 end

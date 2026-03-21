@@ -1,13 +1,19 @@
 name = "RForest"
 uuid = "72125d12-338d-473b-83b8-a958e6b6305f"
-authors = ["JJ Garzella <jjgarzella@gmail.com> and contributors"]
 version = "1.0.0-DEV"
+authors = ["JJ Garzella <jjgarzella@gmail.com> and contributors"]
+
+[deps]
+Oscar = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
 
 [compat]
+Oscar = "1.7.0"
+Primes = "0.5.7"
 julia = "1.10.10"
 
 [extras]
+Primes = "27ebfcd6-29c5-5fa9-bf4b-fb8fc14df3ae"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "Primes"]
