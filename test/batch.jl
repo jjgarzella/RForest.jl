@@ -35,9 +35,16 @@ function batch_factorial(n, e, gamma)
 end
 
 @testset "batch_factorial" begin
-    result = batch_factorial(10, 2, 1//2)
-    @test result[2] == 1
-    @test result[3] == 1
-    @test result[5] == 2
-    @test result[7] == 6
+    result10 = batch_factorial(10, 2, 1//2)
+    @test result10[2] == 1
+    @test result10[3] == 1
+    @test result10[5] == 2
+    @test result10[7] == 6
+
+    result100 = batch_factorial(100, 2, 1//2)
+    expected100 = Dict(2=>1, 3=>1, 5=>2, 7=>6, 11=>120, 13=>44, 17=>149, 19=>75,
+                       23=>47, 29=>766, 31=>1, 37=>882, 41=>706, 43=>429, 47=>2208,
+                       53=>500, 59=>473, 61=>2390, 67=>1071, 71=>4971, 73=>3239,
+                       79=>1263, 83=>2076, 89=>6531, 97=>6618)
+    @test all(result100[p] == v for (p, v) in expected100)
 end
