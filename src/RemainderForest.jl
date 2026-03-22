@@ -62,7 +62,8 @@ Compute modular reductions of matrix products using a remainder forest.
 - `projective`: a boolean (optional). If true, the answer is allowed to be off by a scalar multiple.
 
 # Output
-If `ans` is omitted, a dict indexed by `indices` (or by default `0:length(m)-1`) in which
+If `ans` is omitted, a dict indexed by `indices`. If `indices` is omitted, keys default to
+`0, 1, 2, ...` (0-based integers, matching Python convention) in which
 `l[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`.
 """
 function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing,
