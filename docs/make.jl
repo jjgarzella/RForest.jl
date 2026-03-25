@@ -1,7 +1,7 @@
 using RForest
 using Documenter
 
-DocMeta.setdocmeta!(RForest, :DocTestSetup, :(using RForest); recursive=true)
+DocMeta.setdocmeta!(RForest, :DocTestSetup, :(using RForest, Oscar); recursive=true)
 
 makedocs(;
     modules=[RForest],

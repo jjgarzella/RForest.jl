@@ -144,6 +144,18 @@ Compute modular reductions of matrix products using a remainder forest.
 `M` is a matrix of polynomials; `m` and `k` are vectors; returns a 1-based `Vector`.
 
 `result[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`
+
+# Examples
+```jldoctest
+julia> R, x = polynomial_ring(ZZ, :x);
+
+julia> M = matrix(R, 1, 1, [x]);
+
+julia> l = remainder_forest(M, [5, 7], [3, 4]; kbase=1);
+
+julia> l[1][1, 1], l[2][1, 1]  # 1*2 mod 5, 1*2*3 mod 7
+(2, 6)
+```
 """
 function remainder_forest(M, m::AbstractVector, k::AbstractVector;
                            kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
@@ -166,21 +178,20 @@ function remainder_forest(M, m::Function, k::Function, indices;
 end
 
 """
-    remainder_forest!(ans, M, m, k; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest!(ans, M_or_coeffs..., m, k[, indices]; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
 
-Mutating form: updates `ans[i] *= result[i]` for `i in 1:length(m)`.
+Mutating form of [`remainder_forest`](@ref). Updates `ans[key] *= result[key]` in-place
+for every key and returns `ans`. Accepts the same matrix and `m`/`k` argument forms as
+`remainder_forest`.
 """
+remainder_forest!
+
 function remainder_forest!(ans, M, m::AbstractVector, k::AbstractVector;
                             kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     dim, deg, M1 = _build_M1_from_poly(M)
     return _rf_vec!(ans, dim, deg, M1, m, k, 1:length(m); kbase, V, kappa, cutoff)
 end
 
-"""
-    remainder_forest!(ans, M, m, k, indices; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
-
-Mutating form: updates `ans[x] *= result[x]` for each `x` in `indices`.
-"""
 function remainder_forest!(ans, M, m::Function, k::Function, indices;
                             kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     dim, deg, M1 = _build_M1_from_poly(M)
@@ -249,6 +260,27 @@ end
 
 # ---- Integer-matrix public methods: degree-1, generic fallback ----
 
+"""
+    remainder_forest(A0, A1, m, k; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest(A0, A1, m, k, indices; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+
+Degree-1 integer-matrix form of [`remainder_forest`](@ref). Instead of a polynomial
+matrix, pass the two coefficient matrices `A₀` and `A₁` of `M(x) = A₀ + A₁x` directly.
+
+`A0` and `A1` may be `Matrix{BigInt}`, `MatElem{ZZRingElem}` (Oscar), or any matrix-like
+type whose entries are convertible to `BigInt`. The `m`/`k` arguments and return types
+are the same as the polynomial form.
+
+# Examples
+```jldoctest
+julia> A0 = BigInt[0;;];  A1 = BigInt[1;;];  # M(x) = [[x]]
+
+julia> l = remainder_forest(A0, A1, [5, 7], [3, 4]; kbase=1);
+
+julia> l[1][1, 1], l[2][1, 1]  # 1*2 mod 5, 1*2*3 mod 7
+(2, 6)
+```
+"""
 function remainder_forest(A0, A1, m::AbstractVector, k::AbstractVector;
                            kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     dim, deg, M1 = _build_M1_from_coeffs([A0, A1], (mat, i, j) -> BigInt(mat[i, j]))
@@ -327,6 +359,27 @@ end
 
 # ---- Integer-matrix public methods: vector of coeffs, generic fallback ----
 
+"""
+    remainder_forest(coeffs, m, k; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest(coeffs, m, k, indices; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+
+Arbitrary-degree integer-matrix form of [`remainder_forest`](@ref). Pass the coefficient
+matrices of `M(x) = coeffs[1] + coeffs[2]*x + coeffs[3]*x² + …` as a vector.
+
+Each element of `coeffs` may be a `Matrix{BigInt}`, `MatElem{ZZRingElem}` (Oscar), or any
+matrix-like type whose entries are convertible to `BigInt`. The `m`/`k` arguments and
+return types are the same as the polynomial form.
+
+# Examples
+```jldoctest
+julia> A0 = BigInt[0;;];  A1 = BigInt[1;;];  # M(x) = [[x]]
+
+julia> l = remainder_forest([A0, A1], [5, 7], [3, 4]; kbase=1);
+
+julia> l[1][1, 1], l[2][1, 1]  # 1*2 mod 5, 1*2*3 mod 7
+(2, 6)
+```
+"""
 function remainder_forest(coeffs::AbstractVector, m::AbstractVector, k::AbstractVector;
                            kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     dim, deg, M1 = _build_M1_from_coeffs(coeffs, (mat, i, j) -> BigInt(mat[i, j]))
