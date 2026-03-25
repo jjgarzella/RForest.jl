@@ -30,7 +30,7 @@ function batch_factorial(n, e, gamma)
     m_func = p -> p^e
     primes = Primes.primes(2, n - 1)
 
-    ans = remainder_forest(M, m_func, k_func; kbase=1, indices=primes)
+    ans = remainder_forest(M, m_func, k_func, primes; kbase=1)
     return Dict(p => ans[p][1, 1] for p in primes)
 end
 

@@ -44,29 +44,70 @@ function _poly_coeff(entry, c::Int)::BigInt
 end
 
 """
-    remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest(M, m, k; kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
 
 Compute modular reductions of matrix products using a remainder forest.
+`m` and `k` are vectors; returns a 1-based `Vector`.
 
 # Arguments
 - `M`: a matrix of polynomials with integer coefficients.
-- `m`: a list or dict of integers, or a function.
-- `k`: a list or dict of integers, or a function. This list must be strictly monotone.
+- `m`: a vector of integers (moduli).
+- `k`: a vector of integers (upper limits). Must be strictly monotone.
 - `kbase`: an integer (defaults to 0).
-- `indices`: a list of arbitrary values (optional). If included, `m` and `k` are treated
-  as functions to be evaluated on these indices.
 - `V`: a matrix of integers (optional). If omitted, use the identity matrix.
 - `ans`: a dict of matrices (optional).
 - `kappa`: a tuning parameter (optional).
 - `cutoff`: an integer (optional). If specified, answers are truncated to this many columns.
 
 # Output
-If `ans` is omitted, a dict indexed by `indices`. If `indices` is omitted, keys default to
-`0, 1, 2, ...` (0-based integers, matching Python convention) in which
-`l[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`.
+A `Vector` where `result[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`.
+If `ans` is provided, mutates it in-place (keys `1:length(m)`) and returns `nothing`.
 """
-function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing,
-                          kappa=nothing, cutoff=nothing)
+function remainder_forest(M, m::AbstractVector, k::AbstractVector;
+                           kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+    n = length(m)
+    get_mk = t -> (BigInt(m[t]), Clong(k[t]))
+    return _remainder_forest_impl(M, n, get_mk, 1:n; kbase, V, ans, kappa, cutoff)
+end
+
+"""
+    remainder_forest(M, m, k, indices; kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+
+Compute modular reductions of matrix products using a remainder forest.
+`m` and `k` are functions evaluated at each element of `indices`; returns a `Dict`.
+
+# Arguments
+- `M`: a matrix of polynomials with integer coefficients.
+- `m`: a function mapping each index to a modulus.
+- `k`: a function mapping each index to an upper limit. Results must be strictly monotone.
+- `indices`: a collection of arbitrary values.
+- `kbase`: an integer (defaults to 0).
+- `V`: a matrix of integers (optional). If omitted, use the identity matrix.
+- `ans`: a dict of matrices (optional).
+- `kappa`: a tuning parameter (optional).
+- `cutoff`: an integer (optional). If specified, answers are truncated to this many columns.
+
+# Output
+A `Dict` keyed by `indices` where `result[x] == V * prod(M(j) for j in kbase:k(x)-1) mod m(x)`.
+If `ans` is provided, mutates it in-place and returns `nothing`.
+"""
+function remainder_forest(M, m::Function, k::Function, indices;
+                           kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+    idx_vec = collect(indices)
+    n = length(idx_vec)
+    get_mk = t -> (BigInt(m(idx_vec[t])), Clong(k(idx_vec[t])))
+    mats = _remainder_forest_impl(M, n, get_mk, idx_vec; kbase, V, ans, kappa, cutoff)
+    mats === nothing && return nothing
+    return Dict(zip(idx_vec, mats))
+end
+
+# Internal implementation shared by both dispatch modes.
+# get_mk(t) -> (BigInt modulus, Clong k-value) for 1-based position t
+# idx_list: used for ans mutation keys
+# Returns Vector{MatElem{ZZRingElem}} (1-based), or nothing if ans is provided.
+function _remainder_forest_impl(M, n, get_mk, idx_list;
+                                  kbase=0, V=nothing, ans=nothing,
+                                  kappa=nothing, cutoff=nothing)
 
     nrows(M) == ncols(M) || throw(ArgumentError("M must be square"))
     dim = nrows(M)
@@ -77,8 +118,6 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
         ncols(V) == dim || throw(ArgumentError("Matrix dimension mismatch"))
         nrows(V)
     end
-
-    n = indices === nothing ? length(m) : length(indices)
 
     # Determine maximum polynomial degree across all entries of M
     deg = 0
@@ -103,25 +142,13 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
     n_m1_inited = 0
     errorflag = false
 
-    if indices === nothing
-        for t in 1:n
-            _mpz_init_set!(_mpz_ptr(m1, t - 1), BigInt(m[t]))
-            n_m1_inited += 1
-            k1[t] = Clong(k[t])
-            if (t == 1 && k1[1] < kbase) || (t > 1 && k1[t] < k1[t-1])
-                errorflag = true; break
-            end
-        end
-    else
-        for (t, x) in enumerate(indices)
-            mv = m isa Dict ? m[x] : m(x)
-            kv = k isa Dict ? k[x] : k(x)
-            _mpz_init_set!(_mpz_ptr(m1, t - 1), BigInt(mv))
-            n_m1_inited += 1
-            k1[t] = Clong(kv)
-            if (t == 1 && k1[1] < kbase) || (t > 1 && k1[t] < k1[t-1])
-                errorflag = true; break
-            end
+    for t in 1:n
+        mv, kv = get_mk(t)
+        _mpz_init_set!(_mpz_ptr(m1, t - 1), mv)
+        n_m1_inited += 1
+        k1[t] = kv
+        if (t == 1 && k1[1] < kbase) || (t > 1 && k1[t] < k1[t-1])
+            errorflag = true; break
         end
     end
 
@@ -165,7 +192,7 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
     z = _mpz_alloc(1)
     _mpz_init!(_mpz_ptr(z, 0))
 
-    local result_dict
+    local result_mats
     ansdict = ans !== nothing
 
     try
@@ -179,8 +206,6 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
               A1, V1, Cint(rows), M1, Cint(deg), Cint(dim),
               m1, Clong(kbase), k1, Clong(n), _mpz_ptr(z, 0), Cint(kappa1))
 
-        # Retrieve results
-        idx_list = collect(indices !== nothing ? indices : 0:n-1)
         result_mats = ansdict ? nothing : Vector{MatElem{ZZRingElem}}(undef, n)
 
         t = 0
@@ -202,10 +227,6 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
             end
         end
 
-        if !ansdict
-            result_dict = Dict(zip(idx_list, result_mats))
-        end
-
     finally
         _free_mpz!(M1, dim * dim * (deg + 1))
         _free_mpz!(V1, rows * dim)
@@ -214,5 +235,5 @@ function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=noth
         _free_mpz!(z, 1)
     end
 
-    return ansdict ? nothing : result_dict
+    return ansdict ? nothing : result_mats
 end
