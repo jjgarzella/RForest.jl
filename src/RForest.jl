@@ -4,6 +4,6 @@ using Oscar
 
 include("RemainderForest.jl")
 
-export remainder_forest
+export remainder_forest, remainder_forest!
 
 end

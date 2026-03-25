@@ -44,7 +44,7 @@ function _poly_coeff(entry, c::Int)::BigInt
 end
 
 """
-    remainder_forest(M, m, k; kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest(M, m, k; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
 
 Compute modular reductions of matrix products using a remainder forest.
 `m` and `k` are vectors; returns a 1-based `Vector`.
@@ -55,23 +55,35 @@ Compute modular reductions of matrix products using a remainder forest.
 - `k`: a vector of integers (upper limits). Must be strictly monotone.
 - `kbase`: an integer (defaults to 0).
 - `V`: a matrix of integers (optional). If omitted, use the identity matrix.
-- `ans`: a dict of matrices (optional).
 - `kappa`: a tuning parameter (optional).
 - `cutoff`: an integer (optional). If specified, answers are truncated to this many columns.
 
 # Output
 A `Vector` where `result[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`.
-If `ans` is provided, mutates it in-place (keys `1:length(m)`) and returns `nothing`.
 """
 function remainder_forest(M, m::AbstractVector, k::AbstractVector;
-                           kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+                           kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     n = length(m)
     get_mk = t -> (BigInt(m[t]), Clong(k[t]))
-    return _remainder_forest_impl(M, n, get_mk, 1:n; kbase, V, ans, kappa, cutoff)
+    return _remainder_forest_impl(M, n, get_mk; kbase, V, ans=nothing, kappa, cutoff)
 end
 
 """
-    remainder_forest(M, m, k, indices; kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+    remainder_forest!(ans, M, m, k; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+
+Mutating form of `remainder_forest` for the vector mode. Updates `ans[i] *= result[i]`
+for each `i in 1:length(m)`.
+"""
+function remainder_forest!(ans, M, m::AbstractVector, k::AbstractVector;
+                            kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+    n = length(m)
+    get_mk = t -> (BigInt(m[t]), Clong(k[t]))
+    _remainder_forest_impl(M, n, get_mk; kbase, V, ans, kappa, cutoff, idx_list=1:n)
+    return ans
+end
+
+"""
+    remainder_forest(M, m, k, indices; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
 
 Compute modular reductions of matrix products using a remainder forest.
 `m` and `k` are functions evaluated at each element of `indices`; returns a `Dict`.
@@ -83,30 +95,43 @@ Compute modular reductions of matrix products using a remainder forest.
 - `indices`: a collection of arbitrary values.
 - `kbase`: an integer (defaults to 0).
 - `V`: a matrix of integers (optional). If omitted, use the identity matrix.
-- `ans`: a dict of matrices (optional).
 - `kappa`: a tuning parameter (optional).
 - `cutoff`: an integer (optional). If specified, answers are truncated to this many columns.
 
 # Output
 A `Dict` keyed by `indices` where `result[x] == V * prod(M(j) for j in kbase:k(x)-1) mod m(x)`.
-If `ans` is provided, mutates it in-place and returns `nothing`.
 """
 function remainder_forest(M, m::Function, k::Function, indices;
-                           kbase=0, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
+                           kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
     idx_vec = collect(indices)
     n = length(idx_vec)
     get_mk = t -> (BigInt(m(idx_vec[t])), Clong(k(idx_vec[t])))
-    mats = _remainder_forest_impl(M, n, get_mk, idx_vec; kbase, V, ans, kappa, cutoff)
-    mats === nothing && return nothing
+    mats = _remainder_forest_impl(M, n, get_mk; kbase, V, ans=nothing, kappa, cutoff)
     return Dict(zip(idx_vec, mats))
+end
+
+"""
+    remainder_forest!(ans, M, m, k, indices; kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+
+Mutating form of `remainder_forest` for the function/indices mode. Updates
+`ans[x] *= result[x]` for each `x` in `indices`.
+"""
+function remainder_forest!(ans, M, m::Function, k::Function, indices;
+                            kbase=0, V=nothing, kappa=nothing, cutoff=nothing)
+    idx_vec = collect(indices)
+    n = length(idx_vec)
+    get_mk = t -> (BigInt(m(idx_vec[t])), Clong(k(idx_vec[t])))
+    _remainder_forest_impl(M, n, get_mk; kbase, V, ans, kappa, cutoff, idx_list=idx_vec)
+    return ans
 end
 
 # Internal implementation shared by both dispatch modes.
 # get_mk(t) -> (BigInt modulus, Clong k-value) for 1-based position t
-# idx_list: used for ans mutation keys
+# ans: if not nothing, mutates ans[idx_list[i]] *= mat and returns nothing
+# idx_list: used for ans mutation keys (only needed when ans !== nothing)
 # Returns Vector{MatElem{ZZRingElem}} (1-based), or nothing if ans is provided.
-function _remainder_forest_impl(M, n, get_mk, idx_list;
-                                  kbase=0, V=nothing, ans=nothing,
+function _remainder_forest_impl(M, n, get_mk;
+                                  kbase=0, V=nothing, ans=nothing, idx_list=nothing,
                                   kappa=nothing, cutoff=nothing)
 
     nrows(M) == ncols(M) || throw(ArgumentError("M must be square"))
