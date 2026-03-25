@@ -44,7 +44,7 @@ function _poly_coeff(entry, c::Int)::BigInt
 end
 
 """
-    remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing, projective=false)
+    remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing, kappa=nothing, cutoff=nothing)
 
 Compute modular reductions of matrix products using a remainder forest.
 
@@ -59,7 +59,6 @@ Compute modular reductions of matrix products using a remainder forest.
 - `ans`: a dict of matrices (optional).
 - `kappa`: a tuning parameter (optional).
 - `cutoff`: an integer (optional). If specified, answers are truncated to this many columns.
-- `projective`: a boolean (optional). If true, the answer is allowed to be off by a scalar multiple.
 
 # Output
 If `ans` is omitted, a dict indexed by `indices`. If `indices` is omitted, keys default to
@@ -67,7 +66,7 @@ If `ans` is omitted, a dict indexed by `indices`. If `indices` is omitted, keys 
 `l[i] == V * prod(M(j) for j in kbase:k[i]-1) mod m[i]`.
 """
 function remainder_forest(M, m, k; kbase=0, indices=nothing, V=nothing, ans=nothing,
-                          kappa=nothing, cutoff=nothing, projective=false)
+                          kappa=nothing, cutoff=nothing)
 
     nrows(M) == ncols(M) || throw(ArgumentError("M must be square"))
     dim = nrows(M)
