@@ -62,5 +62,5 @@ jobs:
         run: |
           using Documenter: DocMeta, doctest
           using RForest
-          DocMeta.setdocmeta!(RForest, :DocTestSetup, :(using RForest); recursive=true)
+          DocMeta.setdocmeta!(RForest, :DocTestSetup, :(using RForest, Oscar); recursive=true)
           doctest(RForest)
