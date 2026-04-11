@@ -2,3 +2,6 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 Oscar = "f1435218-dba5-11e9-1e4d-f1a5fab5fc13"
 RForest = "72125d12-338d-473b-83b8-a958e6b6305f"
+
+[compat]
+Oscar = "1.7.2"
